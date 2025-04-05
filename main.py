@@ -4,6 +4,10 @@ import discord
 from discord import app_commands
 import random
 from google.cloud import dialogflow
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement depuis le fichier .env
+load_dotenv()
 
 class BotDiscord(discord.Client):
     def __init__(self):
