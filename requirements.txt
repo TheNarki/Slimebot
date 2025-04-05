@@ -2,3 +2,4 @@ discord.py
 flask
 python-dotenv
 google-cloud-dialogflow
+google-auth
