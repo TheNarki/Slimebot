@@ -63,7 +63,7 @@ async def on_ready():
     print(f"🔗 Connecté à {len(client.guilds)} serveurs")
     print(f"📝 Commandes slash disponibles avec /aide")
     print("="*50)
-    await client.change_presence(activity=discord.Game(name="/aide pour les commandes"))
+    await client.change_presence(activity=discord.Game(name="Tu peux Discuter avec moi! ou fait /aide"))
     client.start_time = discord.utils.utcnow()
 
 CHANNEL_IDS = [
