@@ -15,6 +15,11 @@ load_dotenv()
 music_queues = {}
 volume_levels = {}
 
+intents = discord.Intents.default()
+intents.message_content = True  # Si vous utilisez des messages pour commander le bot
+
+bot = discord.Client(intents=intents)
+
 class BotDiscord(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
