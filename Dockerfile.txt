@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+# Installer ffmpeg et les dépendances système
+RUN apt-get update && \
+    apt-get install -y ffmpeg git && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Définir le dossier de travail
+WORKDIR /app
+
+# Copier ton code dans l'image Docker
+COPY . /app
+
+# Installer les dépendances Python
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Lancer ton bot Discord
+CMD ["python", "main.py"]
