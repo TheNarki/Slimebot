@@ -61,7 +61,7 @@ class BotDiscord(commands.Bot):
 
 client = BotDiscord()
 
-target_channels = [759668011371462702, 1275561641588691016]
+target_channels = [759668011371462702, 1275561641588691016, 1275745333367935079]
 
 @client.event
 async def on_ready():
