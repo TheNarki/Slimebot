@@ -16,3 +16,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Lancer ton bot Discord
 CMD ["python", "main.py"]
+
+RUN pip install --no-cache-dir -U yt-dlp
+
+# Installer FFmpeg
+RUN apt-get update && apt-get install -y ffmpeg
