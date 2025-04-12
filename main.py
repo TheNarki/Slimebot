@@ -160,15 +160,32 @@ async def play_music_queue(guild, voice_client):
 @app_commands.describe(url="URL de la vidéo YouTube")
 async def play(interaction: discord.Interaction, url: str):
     await interaction.response.defer()
+    
+    # Vérifier si l'utilisateur est dans un salon vocal
     voice_channel = interaction.user.voice.channel if interaction.user.voice else None
     if not voice_channel:
         await interaction.followup.send("❌ Tu dois être dans un salon vocal.")
         return
+    
+    # Vérifier si le bot est déjà connecté à un salon vocal
     voice_client = discord.utils.get(client.voice_clients, guild=interaction.guild)
-    if not voice_client or not voice_client.is_connected():
+    
+    if voice_client:  # Le bot est déjà connecté à un salon
+        if voice_client.channel != voice_channel:
+            # Si le bot est connecté à un autre salon, déconnectez-le d'abord
+            await voice_client.disconnect()
+            voice_client = await voice_channel.connect()  # Rejoindre le bon salon
+        else:
+            await interaction.followup.send(f"✅ Déjà connecté au salon vocal '{voice_channel.name}'.")
+    else:
+        # Le bot n'est pas encore connecté, il rejoint donc le salon vocal
         voice_client = await voice_channel.connect()
+    
+    # Ajouter la musique à la file d'attente et commencer à jouer
     music_queues.setdefault(interaction.guild.id, []).append((url, interaction))
     await interaction.followup.send(f"🎶 Ajouté à la file : {url}")
+    
+    # Si le bot ne joue pas déjà de la musique, commencez à jouer
     if not voice_client.is_playing():
         await play_music_queue(interaction.guild, voice_client)
 
