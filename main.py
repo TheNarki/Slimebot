@@ -75,7 +75,7 @@ async def on_ready():
     print(f"🔗 Connecté à {len(client.guilds)} serveurs")
     print(f"📝 Commandes slash disponibles avec /aide")
     print("="*50)
-    await client.change_presence(activity=discord.Game(name="Tu peux Discuter avec moi! ou fait /aide"))
+    await client.change_presence(activity=discord.Game(name="Discute avec moi! Saluez-moi !"))
 
 # Liste des URL de musique à jouer aléatoirement
 MUSIC_LIST = [
