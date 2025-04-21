@@ -12,6 +12,20 @@ from dotenv import load_dotenv
 import yt_dlp  
 load_dotenv()
 
+# Récupère le chemin absolu du dossier où se trouve le script Python
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Crée un chemin vers le dossier sounds
+sound_file = os.path.join(BASE_DIR, "sounds", "poisson.mp3", "Rick.mp3")
+                          
+# Ajoutez cette ligne pour définir les options FFMPEG
+FFMPEG_OPTIONS = {
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+    'options': '-vn'
+}
+
+SOUNDS_FOLDER = os.path.join(BASE_DIR, "sounds")
+
 music_queues = {}
 volume_levels = {}
 
@@ -77,57 +91,58 @@ async def on_ready():
     print("="*50)
     await client.change_presence(activity=discord.Game(name="Discute avec moi! Saluez-moi !"))
 
-# Liste des URL de musique à jouer aléatoirement
+# Liste des fichiers audio
 MUSIC_LIST = [
-    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",  # Rick Astley - Never Gonna Give You Up
-    "https://www.youtube.com/watch?v=3JZ_D3ELwOQ",  # Pharrell Williams - Happy
-    "https://www.youtube.com/watch?v=9bZkp7q19f0",  # PSY - Gangnam Style
-    "https://www.youtube.com/watch?v=KQ6zr6kCPj8",  # Aqua - Barbie Girl
-    "https://www.youtube.com/watch?v=2Vv-BfVoq4g"   # Ed Sheeran - Perfect
+    "Rick.mp3",      # Rick Astley
+    "poisson.mp3",   # Poisson steve
 ]
 
 @client.event
 async def on_message(message):
     if message.author == client.user:
         return
+
+    # Vérifie si le message est dans les salons cibles
     if target_channels and message.channel.id not in target_channels:
         return
-    
-    # 10% de chance que de la musique soit jouée
-    if random.random() < 0.1 and message.author.voice:
-        # Si l'utilisateur est dans un salon vocal
-        voice_channel = message.author.voice.channel
-        voice_client = discord.utils.get(client.voice_clients, guild=message.guild)
-        
-        if not voice_client or not voice_client.is_connected():
-            # Se connecter au canal vocal si pas déjà connecté
-            voice_client = await voice_channel.connect()
 
-        # Choisir une musique aléatoire dans la liste
-        music_url = random.choice(MUSIC_LIST)
-        music_queues.setdefault(message.guild.id, []).append((music_url, message))
+    # Gestion des mots-clés "poisson" ou "steve"
+    if "poisson" in message.content.lower() or "steve" in message.content.lower():
+        if message.author.voice and message.author.voice.channel:
+            voice_channel = message.author.voice.channel
+            try:
+                # Connecte le bot si nécessaire
+                if not message.guild.voice_client:
+                    vc = await voice_channel.connect()
+                else:
+                    vc = message.guild.voice_client
 
-        ydl_opts = {'format': 'bestaudio', 'quiet': True, 'noplaylist': True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(music_url, download=False)
-            audio_url = info['url']
+                # Choix du son en fonction du mot-clé
+                if "poisson" in message.content.lower():
+                    sound_file = get_sound_path("poisson.mp3")
+                elif "steve" in message.content.lower():
+                    sound_file = get_sound_path("Rick.mp3")
 
-        ffmpeg_options = {
-            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-            'options': '-vn'
-        }
+                # Stop l'audio en cours et joue le nouveau son
+                vc.stop()
+                vc.play(FFmpegPCMAudio(sound_file), after=lambda e: print("Lecture terminée."))
 
-        volume = volume_levels.get(message.guild.id, 1.0)
-        source = PCMVolumeTransformer(FFmpegPCMAudio(audio_url, **ffmpeg_options), volume)
+                await message.channel.send(f"🎵 Son lancé : {os.path.basename(sound_file)}")
 
-        # Lancer la lecture
-        voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(message.guild, voice_client), client.loop))
-        await message.channel.send(f"🎶 Lecture : {info['title']}")
-    else:
-        # Si aucune musique n'est jouée, traite le message normalement
-        response = await client.detect_intent(message.content, str(message.author.id))
-        if response:
-            await message.channel.send(response)
+                # Déconnexion après la lecture
+                while vc.is_playing():
+                    await asyncio.sleep(1)  # Attend que la lecture soit finie
+                await vc.disconnect()
+
+            except Exception as e:
+                await message.channel.send(f"Erreur : {e}")
+        else:
+            await message.channel.send("❌ Tu dois être dans un salon vocal pour que je joue le son !")
+
+    # Si aucune musique n'est jouée, traite le message normalement
+    response = await client.detect_intent(message.content, str(message.author.id))
+    if response:
+        await message.channel.send(response)
 
 async def play_next(guild, voice_client):
     music_queues.setdefault(guild.id, [])
@@ -154,45 +169,139 @@ async def play_music_queue(guild, voice_client):
         source = PCMVolumeTransformer(FFmpegPCMAudio(audio_url, **ffmpeg_options), volume)
 
         voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(play_next(guild, voice_client), client.loop))
-        await interaction.followup.send(f"🎶 Lecture : {info['title']}")
+        try:
+            await interaction.followup.send(f"🎶 Lecture : {info['title']}")
+        except discord.errors.InteractionResponded:
+            print("L'interaction a expiré, impossible d'envoyer un message.")
     else:
         await voice_client.disconnect()
 
-# Commandes du bot
+@client.event
+async def on_message(message):
+    if message.author == client.user:
+        return
 
-@client.tree.command(name="play", description="Joue une musique depuis YouTube")
-@commands.guild_only()
-@app_commands.describe(url="URL de la vidéo YouTube")
-async def play(interaction: discord.Interaction, url: str):
+    # Chemin vers le dossier des musiques locales
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    SOUNDS_FOLDER = os.path.join(BASE_DIR, "sounds")
+
+    # Vérifie que l'auteur est connecté à un salon vocal
+    if message.author.voice and message.author.voice.channel:
+        chance = random.random()
+        print(f"💡 Chance: {chance}")  # Debug
+
+        if chance < 0.5:  # 50% pour tester (change à 0.1 après test !)
+            try:
+                files = [f for f in os.listdir(SOUNDS_FOLDER) if f.endswith('.mp3')]
+                if files:
+                    selected_file = random.choice(files)
+                    sound_file = os.path.join(SOUNDS_FOLDER, selected_file)
+
+                    voice_channel = message.author.voice.channel
+                    voice_client = discord.utils.get(client.voice_clients, guild=message.guild)
+
+                    if not voice_client or not voice_client.is_connected():
+                        voice_client = await voice_channel.connect()
+                        print(f"🔊 Connecté au salon : {voice_channel.name}")
+                    elif voice_client.channel != voice_channel:
+                        await voice_client.disconnect()
+                        voice_client = await voice_channel.connect()
+                        print(f"🔁 Déplacé au salon : {voice_channel.name}")
+
+                    if voice_client.is_playing():
+                        voice_client.stop()
+
+                    def after_play(e):
+                        coro = voice_client.disconnect()
+                        fut = asyncio.run_coroutine_threadsafe(coro, client.loop)
+                        try:
+                            fut.result()
+                            print("📤 Déconnecté après lecture.")
+                        except Exception as e:
+                            print(f"Erreur lors de la déconnexion : {e}")
+
+                    voice_client.play(FFmpegPCMAudio(sound_file), after=after_play)
+                    await message.channel.send(f"🎵 Surprise musicale : `{selected_file}`")
+                else:
+                    await message.channel.send("📂 Aucun fichier .mp3 trouvé dans `/sounds`.")
+            except Exception as e:
+                await message.channel.send(f"❌ Erreur : {e}")
+                print(f"Erreur détaillée : {e}")
+        else:
+            print("💤 Pas de musique cette fois.")
+
+    # Et enfin : le traitement Dialogflow
+    response = await client.detect_intent(message.content, str(message.author.id))
+    if response:
+        await message.channel.send(response)
+
+# Commandes du bot
+@client.tree.command(name="joue", description="Joue une musique locale depuis le dossier /sounds")
+@app_commands.describe(fichier="Nom du fichier (ex: Rick.mp3)")
+async def joue(interaction: discord.Interaction, fichier: str):
     await interaction.response.defer()
-    
+
+    # Vérification du fichier
+    file_path = os.path.join(SOUNDS_FOLDER, fichier)
+    if not os.path.isfile(file_path):
+        await interaction.followup.send(f"❌ Le fichier `{fichier}` n'existe pas dans `/sounds`.")
+        return
+
     # Vérifier si l'utilisateur est dans un salon vocal
     voice_channel = interaction.user.voice.channel if interaction.user.voice else None
     if not voice_channel:
-        await interaction.followup.send("❌ Tu dois être dans un salon vocal.")
+        await interaction.followup.send("❌ Tu dois être connecté à un salon vocal.")
         return
-    
-    # Vérifier si le bot est déjà connecté à un salon vocal
+
+    # Connexion
     voice_client = discord.utils.get(client.voice_clients, guild=interaction.guild)
-    
-    if voice_client:  # Le bot est déjà connecté à un salon
-        if voice_client.channel != voice_channel:
-            # Si le bot est connecté à un autre salon, déconnectez-le d'abord
-            await voice_client.disconnect()
-            voice_client = await voice_channel.connect()  # Rejoindre le bon salon
-        else:
-            await interaction.followup.send(f"✅ Déjà connecté au salon vocal '{voice_channel.name}'.")
-    else:
-        # Le bot n'est pas encore connecté, il rejoint donc le salon vocal
+    if not voice_client or not voice_client.is_connected():
         voice_client = await voice_channel.connect()
-    
-    # Ajouter la musique à la file d'attente et commencer à jouer
-    music_queues.setdefault(interaction.guild.id, []).append((url, interaction))
-    await interaction.followup.send(f"🎶 Ajouté à la file : {url}")
-    
-    # Si le bot ne joue pas déjà de la musique, commencez à jouer
-    if not voice_client.is_playing():
-        await play_music_queue(interaction.guild, voice_client)
+    elif voice_client.channel != voice_channel:
+        await voice_client.move_to(voice_channel)
+
+    # Jouer le fichier
+    try:
+        if voice_client.is_playing():
+            voice_client.stop()
+
+        voice_client.play(
+            FFmpegPCMAudio(file_path),
+            after=lambda e: print(f"[DEBUG] Lecture terminée : {e}")
+        )
+
+        await interaction.followup.send(f"🎧 Lecture : `{fichier}`")
+
+        # Attendre que la musique se termine
+        while voice_client.is_playing():
+            await asyncio.sleep(1)
+
+        await voice_client.disconnect()
+        print(f"[DEBUG] Déconnecté de {voice_channel.name}")
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ Erreur : {e}")
+
+@client.tree.command(name="liste", description="Affiche la liste des musiques locales disponibles dans /sounds")
+async def liste(interaction: discord.Interaction):
+    await interaction.response.defer()
+
+    # Répertoire des sons locaux
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    SOUNDS_FOLDER = os.path.join(BASE_DIR, "sounds")
+
+    try:
+        files = [f for f in os.listdir(SOUNDS_FOLDER) if f.endswith('.mp3')]
+        if not files:
+            await interaction.followup.send("📁 Aucun fichier .mp3 trouvé dans `/sounds`.")
+            return
+
+        message = "**🎵 Liste des musiques dispo :**\n"
+        message += "\n".join(f"- `{file}`" for file in files)
+
+        await interaction.followup.send(message)
+    except Exception as e:
+        await interaction.followup.send(f"❌ Erreur lors de la lecture du dossier : {e}")
 
 @client.tree.command(name="pause", description="Met la musique en pause")
 async def pause(interaction: discord.Interaction):
@@ -221,13 +330,8 @@ async def skip(interaction: discord.Interaction):
     else:
         await interaction.response.send_message("❌ Aucune musique à passer.")
 
-@client.tree.command(name="stop", description="Arrête la musique et quitte le salon")
-async def stop(interaction: discord.Interaction):
-    vc = discord.utils.get(client.voice_clients, guild=interaction.guild)
-    music_queues[interaction.guild.id] = []
-    if vc:
-        await vc.disconnect()
-    await interaction.response.send_message("🛑 Lecture arrêtée et file vidée.")
+def get_sound_path(filename):
+    return os.path.join(SOUNDS_FOLDER, filename)
 
 # Autres commandes...
 
