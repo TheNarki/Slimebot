@@ -351,6 +351,58 @@ async def stop(interaction: discord.Interaction):
         print(f"Erreur : {e}")  # Log interne
         await interaction.followup.send("❌ Une erreur est survenue.")
 
+@client.tree.command(name="play", description="Joue une vidéo YouTube dans un salon vocal.")
+@app_commands.describe(url="URL de la vidéo YouTube")
+async def play(interaction: discord.Interaction, url: str):
+    await interaction.response.defer()
+
+    # Vérifier si l'utilisateur est dans un salon vocal
+    if not interaction.user.voice or not interaction.user.voice.channel:
+        await interaction.followup.send("❌ Tu dois être connecté à un salon vocal.")
+        return
+
+    voice_channel = interaction.user.voice.channel
+    voice_client = discord.utils.get(client.voice_clients, guild=interaction.guild)
+
+    # Connexion au salon vocal
+    if not voice_client or not voice_client.is_connected():
+        voice_client = await voice_channel.connect()
+    elif voice_client.channel != voice_channel:
+        await voice_client.move_to(voice_channel)
+
+    # Télécharger l'audio avec yt_dlp
+    try:
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'extract_flat': False,
+            'noplaylist': True,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            audio_url = info['url']
+            title = info.get('title', 'Audio')
+
+        # Jouer l'audio
+        if voice_client.is_playing():
+            voice_client.stop()
+
+        voice_client.play(
+            FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS),
+            after=lambda e: print(f"[DEBUG] Lecture terminée : {e}")
+        )
+
+        await interaction.followup.send(f"🎶 Lecture : **{title}**")
+    except Exception as e:
+        print(f"Erreur : {e}")  # Log interne
+        await interaction.followup.send("❌ Une erreur est survenue lors de la lecture de la vidéo.")
+
 # Autres commandes...
 
 if __name__ == "__main__":
