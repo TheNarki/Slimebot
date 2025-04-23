@@ -19,5 +19,5 @@ CMD ["python", "main.py"]
 
 RUN pip install --no-cache-dir -U yt-dlp
 
-# Installer FFmpeg
+# Installer ffmpeg
 RUN apt-get update && apt-get install -y ffmpeg
