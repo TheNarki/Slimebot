@@ -1,23 +1,27 @@
+# Image officielle Python avec Debian
 FROM python:3.11-slim
 
-# Installer ffmpeg et les dépendances système
+# Installer ffmpeg et dépendances de base
 RUN apt-get update && \
-    apt-get install -y ffmpeg git && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get install -y ffmpeg git curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Définir le dossier de travail
+# Définir le répertoire de travail
 WORKDIR /app
 
-# Copier ton code dans l'image Docker
+# Copier tous les fichiers de ton projet dans le conteneur
 COPY . /app
 
 # Installer les dépendances Python
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Lancer ton bot Discord
+# Spécifie les variables d’environnement (à configurer dans Koyeb)
+ENV PYTHONUNBUFFERED=1
+
+# Ouvre le port si ton app Flask en a besoin (ex. 5000)
+EXPOSE 5000
+
+# Commande pour démarrer ton app
+# Remplace "main.py" par le nom réel de ton fichier principal (ex: bot.py ou app.py)
 CMD ["python", "main.py"]
-
-RUN pip install --no-cache-dir -U yt-dlp
-
-# Installer ffmpeg
-RUN apt-get update && apt-get install -y ffmpeg
