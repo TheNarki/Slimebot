@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import yt_dlp  
 from flask import Flask
 import threading
+from datetime import datetime, time
 
 # Flask app pour garder le bot réveillé
 app = Flask('')
@@ -112,7 +113,32 @@ async def on_ready():
     print("="*50)
     await client.change_presence(activity=discord.Game(name="Discute avec moi! Saluez-moi !"))
 
-    # Synchronisation des commandes slash
+#Change l'avatar du bot à 21h et 8h
+async def change_avatar(path):
+    if os.path.exists(path):
+        with open(path, 'rb') as avatar_file:
+            try:
+                await bot.user.edit(avatar=avatar_file.read())
+                print(f"✅ Avatar changé avec succès ({path})")
+            except Exception as e:
+                print(f"❌ Erreur changement avatar : {e}")
+    else:
+        print(f"❌ Fichier introuvable : {path}")
+
+async def avatar_scheduler():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        now = datetime.now().time()
+
+        if now.hour == 21 and now.minute == 0:
+            await change_avatar("avatar/Sleep.png")
+        elif now.hour == 8 and now.minute == 0:
+            await change_avatar("avatar/Jour.png")
+
+        await asyncio.sleep(60)  # vérifie toutes les minutes
+
+    #On message
+
 @client.event
 async def on_message(message):
     if message.author == client.user:
@@ -135,8 +161,19 @@ async def on_message(message):
 
                 if "poisson" in message.content.lower():
                     sound_file = get_sound_path("poisson.mp3")
+                    temp_avatar_file = f"avatar/Steve.jpg"
+                    original_avatar_file = "avatar/Jour.png"
                 else:
                     sound_file = get_sound_path("Steve.mp3")
+                    temp_avatar_file = f"avatar/Jack.jpg"
+                    original_avatar_file = "avatar/Jour.png"
+
+                    # Changer l’avatar pour le son joué
+                if os.path.exists(temp_avatar_file):
+                    with open(temp_avatar_file, "rb") as af:
+                        await client.user.edit(avatar=af.read())
+                else:
+                    print(f"Fichier d'avatar introuvable : {temp_avatar_file}")
 
                 vc.stop()
                 vc.play(FFmpegPCMAudio(sound_file), after=lambda e: print("Lecture terminée."))
@@ -146,6 +183,11 @@ async def on_message(message):
                 while vc.is_playing():
                     await asyncio.sleep(1)
                 await vc.disconnect()
+
+                # Remettre l’avatar d’origine
+                if os.path.isfile(original_avatar_file):
+                    with open(original_avatar_file, "rb") as af:
+                        await client.user.edit(avatar=af.read())
 
             except Exception as e:
                 await message.channel.send(f"Erreur : {e}")
