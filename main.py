@@ -148,52 +148,52 @@ async def on_message(message):
     if target_channels and message.channel.id not in target_channels:
         return
 
-    # Gestion des mots-clés "poisson" ou "steve"
-    if any(kw in message.content.lower() for kw in ["poisson", "steve"]):
-        if message.author.voice and message.author.voice.channel:
-            voice_channel = message.author.voice.channel
-            try:
+    # Mots-clés spéciaux qui jouent un son et changent d’avatar
+    keyword_actions = {
+        "poisson": {
+            "sound": "poisson.mp3",
+            "avatar": "avatar/Steve.jpg"
+        },
+        "steve": {
+            "sound": "Steve.mp3",
+            "avatar": "avatar/Jack.jpg"
+        },
+        "zizi": {
+            "sound": "Le zizi.mp3",
+            "avatar": "avatar/Jour.jpg"
+        },
+        "caca": {
+            "sound": "caca.mp3",
+            "avatar": "avatar/Jour.jpg"
+        },
+        # Tu peux facilement en ajouter ici :
+        # "motclé": {"sound": "nom_fichier.mp3", "avatar": "chemin_avatar.jpg"}
+    }
+
+    for keyword, action in keyword_actions.items():
+        if keyword in message.content.lower():
+            if message.author.voice and message.author.voice.channel:
+                voice_channel = message.author.voice.channel
                 vc = message.guild.voice_client
                 if not vc:
                     vc = await voice_channel.connect()
                 elif vc.channel != voice_channel:
                     await vc.move_to(voice_channel)
 
-                if "poisson" in message.content.lower():
-                    sound_file = get_sound_path("poisson.mp3")
-                    temp_avatar_file = f"avatar/Steve.jpg"
-                    original_avatar_file = "avatar/Jour.png"
-                else:
-                    sound_file = get_sound_path("Steve.mp3")
-                    temp_avatar_file = f"avatar/Jack.jpg"
-                    original_avatar_file = "avatar/Jour.png"
+                # Lire le son
+                sound_path = os.path.join(BASE_DIR, "sounds", action["sound"])
+                if os.path.exists(sound_path):
+                    vc.play(discord.FFmpegPCMAudio(sound_path))
 
-                    # Changer l’avatar pour le son joué
-                if os.path.exists(temp_avatar_file):
-                    with open(temp_avatar_file, "rb") as af:
-                        await client.user.edit(avatar=af.read())
-                else:
-                    print(f"Fichier d'avatar introuvable : {temp_avatar_file}")
-
-                vc.stop()
-                vc.play(FFmpegPCMAudio(sound_file), after=lambda e: print("Lecture terminée."))
-
-                await message.channel.send(f"🎵 Son lancé : {os.path.basename(sound_file)}")
-
-                while vc.is_playing():
-                    await asyncio.sleep(1)
-                await vc.disconnect()
-
-                # Remettre l’avatar d’origine
-                if os.path.isfile(original_avatar_file):
-                    with open(original_avatar_file, "rb") as af:
-                        await client.user.edit(avatar=af.read())
-
-            except Exception as e:
-                await message.channel.send(f"Erreur : {e}")
-        else:
-            await message.channel.send("❌ Tu dois être dans un salon vocal pour que je joue le son !")
-        return
+                # Changer d’avatar temporairement
+                try:
+                    with open(action["avatar"], "rb") as f:
+                        await client.user.edit(avatar=f.read())
+                    await asyncio.sleep(10)  # Attend 10 secondes avant de remettre l'ancien
+                    with open("avatar/Jour.png", "rb") as f:
+                        await client.user.edit(avatar=f.read())
+                except Exception as e:
+                    print(f"Erreur lors du changement d'avatar : {e}")
 
     # Réaction à "ta gueule"
     if "ta gueule" in message.content.lower():
