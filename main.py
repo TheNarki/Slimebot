@@ -113,30 +113,6 @@ async def on_ready():
     print("="*50)
     await client.change_presence(activity=discord.Game(name="Discute avec moi! Saluez-moi !"))
 
-#Change l'avatar du bot à 21h et 8h
-async def change_avatar(path):
-    if os.path.exists(path):
-        with open(path, 'rb') as avatar_file:
-            try:
-                await bot.user.edit(avatar=avatar_file.read())
-                print(f"✅ Avatar changé avec succès ({path})")
-            except Exception as e:
-                print(f"❌ Erreur changement avatar : {e}")
-    else:
-        print(f"❌ Fichier introuvable : {path}")
-
-async def avatar_scheduler():
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        now = datetime.now().time()
-
-        if now.hour == 21 and now.minute == 0:
-            await change_avatar("avatar/Sleep.png")
-        elif now.hour == 8 and now.minute == 0:
-            await change_avatar("avatar/Jour.png")
-
-        await asyncio.sleep(60)  # vérifie toutes les minutes
-
     #On message
 
 @client.event
@@ -148,52 +124,51 @@ async def on_message(message):
     if target_channels and message.channel.id not in target_channels:
         return
 
-    # Mots-clés spéciaux qui jouent un son et changent d’avatar
+    # Mots-clés spéciaux qui jouent un son
     keyword_actions = {
         "poisson": {
             "sound": "poisson.mp3",
-            "avatar": "avatar/Steve.jpg"
         },
         "steve": {
             "sound": "Steve.mp3",
-            "avatar": "avatar/Jack.jpg"
         },
         "zizi": {
-            "sound": "Le zizi.mp3",
-            "avatar": "avatar/Jour.jpg"
+            "sound": "zizi.mp3",
         },
         "caca": {
             "sound": "caca.mp3",
-            "avatar": "avatar/Jour.jpg"
         },
-        # Tu peux facilement en ajouter ici :
-        # "motclé": {"sound": "nom_fichier.mp3", "avatar": "chemin_avatar.jpg"}
+        # Ajoute d'autres mots ici si besoin
     }
 
+    # Réagit au premier mot-clé détecté seulement
     for keyword, action in keyword_actions.items():
         if keyword in message.content.lower():
             if message.author.voice and message.author.voice.channel:
                 voice_channel = message.author.voice.channel
                 vc = message.guild.voice_client
-                if not vc:
+                if not vc or not vc.is_connected():
                     vc = await voice_channel.connect()
                 elif vc.channel != voice_channel:
                     await vc.move_to(voice_channel)
 
-                # Lire le son
                 sound_path = os.path.join(BASE_DIR, "sounds", action["sound"])
                 if os.path.exists(sound_path):
-                    vc.play(discord.FFmpegPCMAudio(sound_path))
+                    if vc.is_playing():
+                        vc.stop()
 
-                # Changer d’avatar temporairement
-                try:
-                    with open(action["avatar"], "rb") as f:
-                        await client.user.edit(avatar=f.read())
-                    await asyncio.sleep(10)  # Attend 10 secondes avant de remettre l'ancien
-                    with open("avatar/Jour.png", "rb") as f:
-                        await client.user.edit(avatar=f.read())
-                except Exception as e:
-                    print(f"Erreur lors du changement d'avatar : {e}")
+                    def after_play(e):
+                        coro = vc.disconnect()
+                        fut = asyncio.run_coroutine_threadsafe(coro, client.loop)
+                        try:
+                            fut.result()
+                        except Exception as e:
+                            print(f"Erreur lors de la déconnexion : {e}")
+
+                    vc.play(discord.FFmpegPCMAudio(sound_path), after=after_play)
+                else:
+                    await message.channel.send(f"🔇 Fichier introuvable : `{action['sound']}`")
+            break  # On arrête dès qu'un mot-clé a été trouvé et traité
 
     # Réaction à "ta gueule"
     if "ta gueule" in message.content.lower():
@@ -208,7 +183,7 @@ async def on_message(message):
             await message.channel.send("Hein ? Je disais rien moi 😶")
         return
 
-    # 10% chance de jouer un son aléatoire
+    # 30% chance de jouer un son aléatoire
     if message.author.voice and message.author.voice.channel:
         if random.random() < 0.3:
             try:
@@ -233,7 +208,7 @@ async def on_message(message):
                         except Exception as e:
                             print(f"Erreur lors de la déconnexion : {e}")
 
-                    vc.play(FFmpegPCMAudio(sound_path), after=after_play)
+                    vc.play(discord.FFmpegPCMAudio(sound_path), after=after_play)
                     await message.channel.send(f"🎵 Surprise musicale : `{selected_file}`")
                 else:
                     await message.channel.send("📂 Aucun fichier .mp3 trouvé dans `/sounds`.")
