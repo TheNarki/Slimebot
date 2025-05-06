@@ -138,6 +138,9 @@ async def on_message(message):
         "caca": {
             "sound": "caca.mp3",
         },
+        "Rick": {
+            "sound": "Rick.mp3",
+        },
         # Ajoute d'autres mots ici si besoin
     }
 
@@ -182,39 +185,6 @@ async def on_message(message):
         else:
             await message.channel.send("Hein ? Je disais rien moi 😶")
         return
-
-    # 30% chance de jouer un son aléatoire
-    if message.author.voice and message.author.voice.channel:
-        if random.random() < 0.3:
-            try:
-                files = [f for f in os.listdir(SOUNDS_FOLDER) if f.endswith('.mp3')]
-                if files:
-                    selected_file = random.choice(files)
-                    sound_path = os.path.join(SOUNDS_FOLDER, selected_file)
-                    vc = message.guild.voice_client
-                    if not vc:
-                        vc = await message.author.voice.channel.connect()
-                    elif vc.channel != message.author.voice.channel:
-                        await vc.move_to(message.author.voice.channel)
-
-                    if vc.is_playing():
-                        vc.stop()
-
-                    def after_play(e):
-                        coro = vc.disconnect()
-                        fut = asyncio.run_coroutine_threadsafe(coro, client.loop)
-                        try:
-                            fut.result()
-                        except Exception as e:
-                            print(f"Erreur lors de la déconnexion : {e}")
-
-                    vc.play(discord.FFmpegPCMAudio(sound_path), after=after_play)
-                    await message.channel.send(f"🎵 Surprise musicale : `{selected_file}`")
-                else:
-                    await message.channel.send("📂 Aucun fichier .mp3 trouvé dans `/sounds`.")
-            except Exception as e:
-                await message.channel.send(f"❌ Erreur : {e}")
-            return
 
     # Traitement par Dialogflow
     response = await client.detect_intent(message.content, str(message.author.id))
