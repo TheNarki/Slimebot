@@ -148,10 +148,10 @@ async def on_message(message):
             "sound": "Screamer.mp3",
         },
         "darwin": {
-            "sound": "Darwin.mp3",
+            "sound": "Darwin_court.mp3",
         },
         "chemin": {
-            "sound": "Darwin.mp3",
+            "sound": "Darwin_court.mp3",
         }
         # Ajoute d'autres mots ici si besoin
     }
